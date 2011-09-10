@@ -66,6 +66,7 @@ Point.prototype.distanceSquaredToPoint = function(point) {
 ////////////////////////////////////////////////
 // Circle - center (Point), and radius properties
 ////////////////////////////////////////////////
+
 function Circle(center, radius) {
     this.center = center;
     this.radius = radius;
@@ -88,6 +89,45 @@ Circle.prototype.intersectsSegment = function(segment) {
 
 
 ////////////////////////////////////////////////
+// Rectangle - top, left, bottom, right
+//    perhaps should be 2 points avoid the garbage
+////////////////////////////////////////////////
+
+function Rectangle(x1, y1, x2, y2) {
+    this.top = this.bottom = y1;
+    this.left = this.right = x1;
+    this.expand(x2, y2);
+}
+
+Rectangle.prototype.expand = function(x, y) {
+    if (x < this.left) {
+        this.left = x;
+    }
+    else if (x > this.right) {
+        this.right = x;
+    }
+    if (y > this.top) {
+        this.top = y;
+    }
+    else if (y < this.bottom) {
+        this.bottom = y;
+    }
+}
+
+Rectangle.prototype.intersectsRect = function(rectangle) {
+    if (this.top < rectangle.bottom || this.bottom > rectangle.top) {
+        return false;
+    }
+    if (this.left > rectangle.right || this.right < rectangle.left) {
+        return false;
+    }
+    return true;
+}
+
+
+
+
+////////////////////////////////////////////////
 // Segment - A line segment joining point1 (Point) and point2 (Point)
 ////////////////////////////////////////////////
 
@@ -103,12 +143,26 @@ Segment.prototype.draw = function(context) {
     context.stroke();
 }
 
+Segment.prototype.getBoundsRect = function() {
+    if (this.boundsRect == undefined) {
+        this.boundsRect = new Rectangle(this.point1.x, this.point1.y, this.point2.x, this.point2.y);
+    }
+    return this.boundsRect;
+}
+
 Segment.prototype.isEmpty = function() {
     return this.point1.x == this.point2.x && this.point1.y == this.point2.y;
 }
 
 // Parallel or coincident lines return null
 Segment.prototype.intersectsSegment = function(segment) {
+
+
+    // this is slow so first check bounding boxes before doing "maths"
+    if (!this.getBoundsRect().intersectsRect(segment.getBoundsRect())) {
+        return null;
+    }
+
     // See http://paulbourke.net/geometry/lineline2d/
 
     var p1 = this.point1;
@@ -284,24 +338,6 @@ Polygon.prototype.toString = function() {
 }
 
 
-function PolygonTest() {
-    var segments = new Array();
-    segments.push(new Segment(new Point(0, 0), new Point(0, 1)));
-    segments.push(new Segment(new Point(0, 1), new Point(1, 1)));
-    segments.push(new Segment(new Point(1, 1), new Point(1, 0)));
-    segments.push(new Segment(new Point(1, 0), new Point(0, 0)));
-    var poly1 = new Polygon(segments);
-
-    console.log(poly1.containsPoint(new Point(.1, .2)));
-
-    var split = poly1.split(new Segment(new Point(.5, 0), new Point(.5, 1)));
-    split.forEach(function(poly) {
-        console.log(poly.toString());
-    });
-}
-
-
-
 
 
 //////////////////////////////////////////////////////////////
@@ -310,7 +346,6 @@ function PolygonTest() {
 
 function Particle(circle, polygon) {
     this.circle = circle;
-    var points = new Array();
     this.polygon = polygon;
 }
 
@@ -328,67 +363,48 @@ Particle.prototype.intersectsSegment = function(segment) {
 }
 
 
-Particle.prototype.refineBoundingPolygon = function(segment) {
-    if (this.intersectsSegment(segment)) {
-        return false;
-    }
+Particle.prototype.computeBoundingPolygon = function(bounds, rays) {
 
-    var polygons = this.polygon.split(segment);
-    if (polygons == null) {
-        return true;
-    }
+    this.polygon = bounds;
+    for (var i = 0; i < rays.length; i++) {
+        if (rays[i].state) {
 
-    if (polygons[0].containsPoint(this.circle.center)) {
-        this.polygon = polygons[0];
+            var polygons = this.polygon.split(rays[i].segment);
+            if (polygons == null) {
+                continue;
+            }
+
+            if (polygons[0].containsPoint(this.circle.center)) {
+                this.polygon = polygons[0];
+            }
+            else {
+                this.polygon = polygons[1];
+            }
+        }
     }
-    else {
-        this.polygon = polygons[1];
-    }
-    return true;
 }
 
-Particle.prototype.moveForSegment = function(segment, mutate) {
+Particle.prototype.particleMovedBySegment = function(segment) {
     if (this.intersectsSegment(segment)) {
-        return false;
+        return null;
     }
 
     var polygons = this.polygon.split(segment);
     if (polygons == null) {
-        return true;
+        return this;
     }
 
     for (var i = 0; i < polygons.length; i++) {
         var newCenter = polygons[i].centroid();
         var newCircle = new Circle(newCenter, this.circle.radius);
         if (!polygons[i].intersectsCircle(newCircle)) {
-            if (mutate) {
-                this.polygon = polygons[i];
-                this.circle = newCircle;
-            }
-            return true;
+            return new Particle(newCircle, polygons[i]);
         }
     }
 
-    return false;
+    return null;
 }
 
-
-function ParticleTest() {
-    var segments = new Array();
-    segments.push(new Segment(new Point(0, 0), new Point(0, 1)));
-    segments.push(new Segment(new Point(0, 1), new Point(1, 1)));
-    segments.push(new Segment(new Point(1, 1), new Point(1, 0)));
-    segments.push(new Segment(new Point(1, 0), new Point(0, 0)));
-    var poly1 = new Polygon(segments);
-
-    var particle = new Particle(new Circle(new Point(.5, .5), .1), poly1);
-    console.log(particle.polygon.toString());
-
-    console.log(particle.refineBoundingPolygon(new Segment(new Point(.2, 0), new Point(.2, 1))));
-
-    console.log(particle.polygon.toString());
-
-}
 
 
 
@@ -430,6 +446,12 @@ function Universe() {
 
     this.rays = new Array();
 
+    for (var i = 0; i < segments.length; i++) {
+        var ray = new Ray(segments[i]);
+        ray.state = true;
+        this.rays.push(ray);
+    }
+
     for (var i = 0; i < 200; i++) {
         var ray = this.generateRay();
 
@@ -445,7 +467,7 @@ function Universe() {
         this.rays.push(ray);
     }
 
-    this.refineParticleBoundingPolygons();
+    this.computeParticleBoundingPolygons();
 }
 
 Universe.prototype.generateRay = function() {
@@ -459,7 +481,7 @@ Universe.prototype.generateRay = function() {
 
 Universe.prototype.simulateStep = function() {
     this.stepCount++;
-    var rayIndex = Math.floor(Math.random() * this.rays.length);
+    var rayIndex = this.bounds.segments.length + Math.floor(Math.random() * (this.rays.length - this.bounds.segments.length));
     var ray = this.rays[rayIndex];
 
     if (ray.state) {
@@ -467,33 +489,27 @@ Universe.prototype.simulateStep = function() {
     }
     else {
 
-        this.refineParticleBoundingPolygons();
+        this.computeParticleBoundingPolygons();
 
-        var success = true;
+        var newParticles = new Array();
         for (var i = 0; i < this.particles.length; i++) {
-            if (!this.particles[i].moveForSegment(ray.segment, false)) {
-                success = false;
+	    var newParticle = this.particles[i].particleMovedBySegment(ray.segment);
+            if (newParticle == null) {
                 break;
             }
+            newParticles.push(newParticle);
         }        
 
-        if (success) {
-            for (var i = 0; i < this.particles.length; i++) {
-                this.particles[i].moveForSegment(ray.segment, true);
-            }
+	if (newParticles.length == this.particles.length) {
+            this.particles = newParticles;
             ray.state = true;
         }
     }
 }
 
-Universe.prototype.refineParticleBoundingPolygons = function() {
+Universe.prototype.computeParticleBoundingPolygons = function() {
     for (var i = 0; i < this.particles.length; i++) {
-        this.particles[i].polygon = this.bounds;
-        for (var j = 0; j < this.rays.length; j++) {
-            if (this.rays[j].state) {
-                this.particles[i].refineBoundingPolygon(this.rays[j].segment);
-            }
-        }
+        this.particles[i].computeBoundingPolygon(this.bounds, this.rays);
     }
 }
 
@@ -511,15 +527,9 @@ Universe.prototype.averageDistance = function() {
 }
 
 
-
-
-Universe.prototype.draw = function() {
-    var canvas = document.getElementById('mikado-canvas');
-    var context = canvas.getContext('2d');
+Universe.prototype.draw = function(context) {
     context.fillStyle = "white";
-    context.fillRect(0,0,500,500);
-    context.save();
-    context.scale(400, 400);
+    context.fillRect(-1,-1,2,2);
 
     context.strokeStyle = "black";
     context.lineWidth = .005;
@@ -539,6 +549,4 @@ Universe.prototype.draw = function() {
     for (var i = 0; i < this.particles.length; i++) {
         this.particles[i].draw(context);
     }
-
-    context.restore();
 }

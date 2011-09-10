@@ -3,7 +3,12 @@
 //
 // To run, install v8 (including the shell):
 //
-// % echo 'runTests();' | ./shell --shell mikado.js test.js
+// % echo 'runTests();' | shell --shell mikado.js test.js
+//
+// To profile
+//
+// % echo 'simulate(100000);' | shell --prof --shell mikado.js test.js
+// % ./tools/mac-tick-processor v8.log
 
 
 var successCount = 0;
@@ -123,13 +128,86 @@ function testPolygon() {
     assertTrue(!poly.intersectsCircle(circle), 'poly intersectsCircle 2'); 
 }
 
+function testRectangle() {
+    var r = new Rectangle(0, 1, 2, 3);
+    assertTrue(r.left == 0, 'ctor 1');
+    assertTrue(r.bottom == 1, 'ctor 2');
+    assertTrue(r.top == 3, 'ctor 3');
+    assertTrue(r.right == 2, 'ctor 4');
+
+    r.expand(1, 1);
+    assertTrue(r.left == 0, 'ctor 5');
+    assertTrue(r.bottom == 1, 'ctor 6');
+    assertTrue(r.top == 3, 'ctor 7');
+    assertTrue(r.right == 2, 'ctor 8');
+
+    r.expand(-1, -1);
+    assertTrue(r.left == -1, 'ctor 9');
+    assertTrue(r.bottom == -1, 'ctor 10');
+    assertTrue(r.top == 3, 'ctor 11');
+    assertTrue(r.right == 2, 'ctor 12');
+
+    r = new Rectangle(0, 0, 1, 1);
+    var r2 = new Rectangle(2, 2, 3, 3);
+    assertTrue(!r.intersectsRect(r2), 'intersectsRect 1');
+
+    var r2 = new Rectangle(-2, -2, -1, -1);
+    assertTrue(!r.intersectsRect(r2), 'intersectsRect 2');
+
+    var r2 = new Rectangle(10, 0, 11, 1);
+    assertTrue(!r.intersectsRect(r2), 'intersectsRect 3');
+
+    var r2 = new Rectangle(-10, 0, -9, 1);
+    assertTrue(!r.intersectsRect(r2), 'intersectsRect 4');
+
+    var r2 = new Rectangle(0, 10, 1, 11);
+    assertTrue(!r.intersectsRect(r2), 'intersectsRect 5');
+
+    var r2 = new Rectangle(0, -10, 1, -9);
+    assertTrue(!r.intersectsRect(r2), 'intersectsRect 6');
+
+    var r2 = new Rectangle(.2, .2, .6, .6);
+    assertTrue(r.intersectsRect(r2), 'intersectsRect 7');
+
+    var r2 = new Rectangle(-1, .2, .5, .5);
+    assertTrue(r.intersectsRect(r2), 'intersectsRect 7');
+
+    var r2 = new Rectangle(0, .2, 1.5, .5);
+    assertTrue(r.intersectsRect(r2), 'intersectsRect 7');
+
+    var r2 = new Rectangle(.5, .5, 1.5, 1.5);
+    assertTrue(r.intersectsRect(r2), 'intersectsRect 7');
+
+    var r2 = new Rectangle(.5, .5, -1.5, -1.5);
+    assertTrue(r.intersectsRect(r2), 'intersectsRect 7');
+
+    var r2 = new Rectangle(-10, -10, 10, 10);
+    assertTrue(r.intersectsRect(r2), 'intersectsRect 7');
+}
+
 
 function runTests() {
     testPoint();
     testCircle();
+    testRectangle();
     testSegment();
     testPolygon();
 
     reportResults();
 }
+
+function simulate(steps) {
+    var universe = new Universe();
+    
+    var start = (new Date).getTime();
+    for (var i = 0; i < steps; i++) {
+        universe.simulateStep();
+        if (i % 1000 == 0 && i > 1) {
+            print(universe.averageDistance() + ' (step ' + universe.stepCount + ')');
+        }
+    }
+    var end = (new Date).getTime();
+    print("Duration: " + (end - start) + "ms");
+}
+
 
