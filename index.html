@@ -10,10 +10,44 @@
     You need a modern browser
 </canvas>
 
+<br/>
+<br/>
+<button onclick="step();">Step</button>
+<button onclick="start();">Start</button>
+<button onclick="stop();">Stop</button>
+
+<br/>
+Step:<span id="stepCount">0</span>
+<br/>
+Distance:<span id="distance">0</span>
+
 <script>
     var universe = new Universe();
     universe.draw();
-//ParticleTest();
+    var stepCountElement = document.getElementById('stepCount');
+    var distanceElement = document.getElementById('distance');
+    distanceElement.innerHTML = universe.averageDistance();
+
+    function step() {
+        for (var i = 0; i < 100; i++) {
+            universe.simulateStep();
+        }
+        universe.draw();
+        stepCountElement.innerHTML = universe.stepCount;
+        distanceElement.innerHTML = universe.averageDistance();
+    }
+
+    var interval = null;
+    function start() {
+        interval = window.setInterval(step, 10);
+    }
+
+    function stop() {
+        if (interval) {
+            window.clearInterval(interval);
+            interval = null;
+        }
+    }
 
 </script>
 
