@@ -4,30 +4,31 @@
     <script src="mikado.js"></script>
 </head>
 
-<body>
+<body style="font: 12px arial,sans-serif">
 
-<canvas id="mikado-canvas" width="400" height="400">
+<canvas id="mikado-canvas" width="400" height="400" style="display:block; margin-bottom:10px; padding:0px">
     You need a modern browser
 </canvas>
 
-<br/>
-<br/>
-<button onclick="step();">Step</button>
 <button onclick="start();">Start</button>
 <button onclick="stop();">Stop</button>
+<button onclick="step();">Step</button>
 
-<br/>
-Step: <span id="stepCount">0</span>
-<br/>
-Average Distance: <span id="distance">0</span>
+&nbsp;
+&nbsp;
+&nbsp;
+
+Step: <span id="stepCount" style="font-weight:bold;">0</span>
+
+Average Distance: <span id="distance" style="font-weight:bold;">0</span>
 
 <script>
     var universe = new Universe();
     var stepCountElement = document.getElementById('stepCount');
     var distanceElement = document.getElementById('distance');
-    distanceElement.innerHTML = universe.averageDistance();
     var canvas = document.getElementById('mikado-canvas');
     draw();
+    updateStats();
 
     function draw() {
         var context = canvas.getContext('2d');
@@ -42,8 +43,12 @@ Average Distance: <span id="distance">0</span>
             universe.simulateStep();
         }
         draw();
+        updateStats();
+    }
+
+    function updateStats() {
         stepCountElement.innerHTML = universe.stepCount;
-        distanceElement.innerHTML = universe.averageDistance();
+        distanceElement.innerHTML = '.' + Math.floor(10000*universe.averageDistance());
     }
 
     var interval = null;
