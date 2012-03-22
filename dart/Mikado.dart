@@ -44,7 +44,7 @@ class Mikado {
   
   void start(dart.Event event) {
     stop(event);
-    interval = dart.window.setInterval(() => step(null), 500);
+    interval = dart.window.setInterval(() => step(null), 10);
   }
 
   void stop(dart.Event event) {
